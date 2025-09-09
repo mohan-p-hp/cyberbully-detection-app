@@ -1,0 +1,18 @@
+Python virtual environment
+.venv/
+venv/
+env/
+
+Python cache files
+pycache/
+*.pyc
+
+Dataset files (optional, but recommended for large files)
+Keep this line if your CSV is very large
+Cyberbullying.csv
+data/
+
+IDE and OS specific files
+.idea/
+.vscode/
+*.DS_Store
