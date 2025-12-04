@@ -9,6 +9,7 @@ import joblib
 import os
 import warnings
 from nltk.corpus import stopwords
+import emoji
 
 # ML/DL Libraries
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
@@ -31,8 +32,16 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # (Functions: clean_text, TextStats, load_and_prepare_data, make_preprocessor)
 def clean_text(s): # ... (same as before)
     if not isinstance(s, str): return ""
-    s = html.unescape(s); s = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', s)
-    s = re.sub(r'https?://\S+|www.\S+', ' URL ', s); s = s.lower().strip()
+    # 1. Unescape HTML
+    s = html.unescape(s)
+    # 2. NEW: Convert emojis to their text descriptions
+    s = emoji.demojize(s, delimiters=(":", ":"))
+    # 3. Remove non-printable characters
+    s = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', s)
+    # 4. Replace URLs
+    s = re.sub(r'https?://\S+|www\.\S+', ' URL ', s)
+    # 5. Convert to lowercase and clean up spaces
+    s = s.lower().strip()
     return re.sub(r'\s+', ' ', s)
 
 class TextStats(BaseEstimator, TransformerMixin): # ... (same as before)
