@@ -27,6 +27,9 @@ from pydub import AudioSegment
 # --- Gemini Imports ---
 import google.generativeai as genai
 
+from audio_tone import extract_tone_features, classify_tone
+
+
 
 # ===============================
 #  CONFIGURATION
@@ -471,6 +474,13 @@ def analyze_audio():
     wav_io = io.BytesIO()
     audio.export(wav_io, format="wav")
     wav_io.seek(0)
+    
+    # ⭐ NEW: Tone Detection
+    features = extract_tone_features(wav_io)
+    tone_label, tone_score = classify_tone(features)
+
+    # Reset pointer for transcription
+    wav_io.seek(0)
 
     recognizer = sr.Recognizer()
     with sr.AudioFile(wav_io) as source:
@@ -479,6 +489,10 @@ def analyze_audio():
 
     result = perform_analysis(transcribed, current_user.id)
     result["extracted_text"] = transcribed
+    result["tone_label"] = tone_label
+    result["tone_score"] = tone_score
+    result["tone_features"] = features
+    
     return jsonify(result)
 
 
@@ -512,6 +526,76 @@ def get_admin_logs():
         })
 
     return jsonify(output)
+
+@app.route("/api/admin/users")
+@login_required
+def get_users():
+    if current_user.role != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    users = User.query.all()
+    output = []
+    for u in users:
+        output.append({
+            "id": u.id,
+            "username": u.username,
+            "role": u.role
+        })
+
+    return jsonify(output)
+
+@app.route("/api/admin/users/<int:user_id>/promote", methods=["POST"])
+@login_required
+def promote_user(user_id):
+    if current_user.role != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    user.role = "admin"
+    db.session.commit()
+
+    return jsonify({"message": "User promoted"})
+
+@app.route("/api/admin/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+def delete_user(user_id):
+    if current_user.role != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"message": "User deleted"})
+
+@app.route("/api/history")
+@login_required
+def get_user_history():
+    logs = (
+        AnalysisLog.query
+        .filter_by(user_id=current_user.id)
+        .order_by(AnalysisLog.timestamp.desc())
+        .limit(10)
+        .all()
+    )
+
+    output = []
+    for log in logs:
+        output.append({
+            "text": log.text_analyzed,
+            "label": log.prediction,
+            "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "confidence": log.confidence,
+        })
+
+    return jsonify(output)
+
 
 
 # ===============================
